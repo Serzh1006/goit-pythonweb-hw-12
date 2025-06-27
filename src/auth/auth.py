@@ -10,17 +10,39 @@ from src.databases.models import User
 ALGORITHM = os.getenv("ALGORITHM")
 SECRET_KEY = os.getenv("SECRET_KEY")
 
+
 class Hash:
     pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
     def verify_password(self, plain_password, hashed_password):
+        """
+        Перевіряє пароль користувача.
+        :param plain_password: пароль користувача
+        :param hashed_password: хеш пароль користувача
+        :return: true or false
+        """
         return self.pwd_context.verify(plain_password, hashed_password)
 
     def get_password_hash(self, password: str):
+        """
+        Генерує хеш для паролю користувача.
+        :param password: пароль користувача
+        :return: Хеш паролю
+        """
         return self.pwd_context.hash(password)
 
 
-async def create_access_token(data: dict, expires_delta = 3600):
+async def create_access_token(data: dict, expires_delta=3600):
+    """
+    Створює JWT access token для автентифікації користувача.
+
+    Args:
+        data (dict): Дані, які будуть закодовані в токен (наприклад, {"sub": email}).
+        expires_delta (int, optional): Час життя токена в секундах. За замовчуванням 3600 секунд (1 година).
+
+    Returns:
+        str: JWT access token.
+    """
     to_encode = data.copy()
     expire = datetime.now(timezone.utc) + timedelta(seconds=expires_delta)
     to_encode.update({"exp": expire})
@@ -28,7 +50,21 @@ async def create_access_token(data: dict, expires_delta = 3600):
 
 
 async def get_current_user(
-    token: HTTPAuthorizationCredentials = Depends(HTTPBearer()), db = Depends(get_db)):
+    token: HTTPAuthorizationCredentials = Depends(HTTPBearer()), db=Depends(get_db)
+):
+    """
+    Отримує поточного авторизованого користувача з JWT токена.
+
+    Args:
+        token (HTTPAuthorizationCredentials): JWT токен з заголовка Authorization.
+        db (Session): Сесія бази даних, отримана через Depends(get_db).
+
+    Raises:
+        HTTPException: Якщо токен недійсний або користувача не знайдено.
+
+    Returns:
+        User: Об'єкт користувача з бази даних.
+    """
     credentials_exception = HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
         detail="Could not validate credentials",
@@ -42,7 +78,7 @@ async def get_current_user(
             raise credentials_exception
     except JWTError as e:
         raise credentials_exception
-    
+
     user = db.query(User).filter(User.email == email).first()
     if user is None:
         raise credentials_exception

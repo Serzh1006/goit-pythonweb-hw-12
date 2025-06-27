@@ -25,11 +25,32 @@ app.add_middleware(
 
 @app.get("/", name="API root")
 def get_index():
+    """
+    Базовий маршрут API.
+
+    Returns:
+        dict: Повідомлення-привітання для користувача.
+    """
     return {"message": "Welcome to Contacts API."}
 
 
 @app.get("/health", name="Service availability")
 def get_health_status(db=Depends(get_db)):
+    """
+    Перевіряє доступність бази даних.
+
+    Виконує простий SQL-запит `SELECT 1+1` для перевірки з'єднання з БД.
+    Якщо запит не виконується або не повертає результат — викидається помилка 503.
+
+    Args:
+        db: Залежність FastAPI для отримання сесії бази даних.
+
+    Returns:
+        dict: Повідомлення про стан бази даних.
+
+    Raises:
+        HTTPException: Якщо база даних не відповідає або не налаштована.
+    """
     try:
         result = db.execute(text("Select 1+1")).fetchone()
         print(result)
@@ -45,6 +66,18 @@ def get_health_status(db=Depends(get_db)):
 
 @app.exception_handler(RateLimitExceeded)
 async def rate_limit_handler(request: Request, exc: RateLimitExceeded):
+    """
+    Обробляє помилки перевищення ліміту запитів.
+
+    Повертає статус 429 Too Many Requests з повідомленням українською мовою.
+
+    Args:
+        request (Request): Вхідний HTTP-запит.
+        exc (RateLimitExceeded): Виняток, що виник при перевищенні ліміту.
+
+    Returns:
+        JSONResponse: JSON-відповідь з кодом 429 та повідомленням.
+    """
     return JSONResponse(
         status_code=status.HTTP_429_TOO_MANY_REQUESTS,
         content={"error": "Перевищено ліміт запитів. Спробуйте пізніше."},

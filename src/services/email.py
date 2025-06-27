@@ -17,17 +17,29 @@ conf = ConnectionConfig(
     MAIL_SSL_TLS=False,
     USE_CREDENTIALS=True,
     VALIDATE_CERTS=False,
-    TEMPLATE_FOLDER="./src/templates"
+    TEMPLATE_FOLDER= os.path.abspath(os.path.join(os.path.dirname(__file__), "../templates")),
 )
 
+
 async def send_verification_email(email: EmailStr, username, host):
+    """
+    Отправляет письмо для подтверждения email с токеном в HTML-шаблоне.
+
+    Args:
+        email (EmailStr): Email адрес получателя.
+        username (str): Имя пользователя для персонализации письма.
+        host (str): URL хоста, используется в письме (например, для ссылки подтверждения).
+
+    Returns:
+        None
+    """
     token = await create_email_token({"sub": email})
     message = MessageSchema(
         subject="Email Verification",
         recipients=[email],
-        template_body = {"host": host, "username": username, "token": token},
-        subtype=MessageType.html
+        template_body={"host": host, "username": username, "token": token},
+        subtype=MessageType.html,
     )
 
     fm = FastMail(conf)
-    await fm.send_message(message, template_name = "templates.html")
+    await fm.send_message(message, template_name="templates.html")

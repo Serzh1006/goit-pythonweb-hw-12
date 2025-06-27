@@ -14,6 +14,15 @@ Base = declarative_base()
 
 
 def get_db():
+    """
+    Створює та надає сесію до бази даних для одного запиту.
+
+    Yields:
+        Session: Об'єкт сесії SQLAlchemy для виконання запитів до бази даних.
+
+    Ensures:
+        Сесія буде автоматично закрита після завершення використання.
+    """
     connection = Session()
     try:
         yield connection
