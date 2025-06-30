@@ -8,11 +8,8 @@ class UserCreate(BaseModel):
     password: str
 
 class UserOut(BaseModel):
-    id: int
     username: str
     email: EmailStr
-    password: str
-    created_at: datetime
     avatar: Optional[str]
 
     class Config:

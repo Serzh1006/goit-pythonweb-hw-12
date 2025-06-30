@@ -3,6 +3,7 @@ from pydantic import EmailStr
 import os
 from dotenv import load_dotenv
 from src.services.email_token import create_email_token
+from src.auth.auth import create_password_reset_token
 
 load_dotenv()
 
@@ -17,8 +18,22 @@ conf = ConnectionConfig(
     MAIL_SSL_TLS=False,
     USE_CREDENTIALS=True,
     VALIDATE_CERTS=False,
-    TEMPLATE_FOLDER= os.path.abspath(os.path.join(os.path.dirname(__file__), "../templates")),
+    TEMPLATE_FOLDER=os.path.abspath(
+        os.path.join(os.path.dirname(__file__), "../templates")
+    ),
 )
+
+
+async def send_reset_email(email: str, username: str, host):
+    token = await create_password_reset_token(email)
+    message = MessageSchema(
+        subject="Password Reset",
+        recipients=[email],
+        template_body={"host": host, "username": username, "token": token},
+        subtype=MessageType.html,
+    )
+    fm = FastMail(conf)
+    await fm.send_message(message, template_name="reset_password.html")
 
 
 async def send_verification_email(email: EmailStr, username, host):

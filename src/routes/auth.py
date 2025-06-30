@@ -1,14 +1,97 @@
 from src.schemas.user import UserCreate, UserLogin
 from src.databases.connect import get_db
-from fastapi import Depends, HTTPException, APIRouter, status, BackgroundTasks, Request
+from fastapi import (
+    Depends,
+    HTTPException,
+    APIRouter,
+    status,
+    BackgroundTasks,
+    Request,
+    Form,
+)
+from fastapi.responses import HTMLResponse
+from fastapi.templating import Jinja2Templates
 from src.databases.models import User
 from src.repository.users import create_user, authenticate_user
-from src.auth.auth import create_access_token
+from src.auth.auth import (
+    create_access_token,
+    create_password_reset_token,
+    verify_password_reset_token,
+    Hash,
+)
 from src.services.email_token import decode_email_token
-from src.services.email import send_verification_email
+from src.services.email import send_verification_email, send_reset_email
 
+hasher = Hash()
 
 router = APIRouter(prefix="/auth", tags=["auth"])
+templates = Jinja2Templates(directory="src/templates")
+
+
+@router.get("/new-password/{token}", response_class=HTMLResponse)
+async def reset_password_form(request: Request, token: str):
+    return templates.TemplateResponse(
+        "reset_form.html", {"request": request, "token": token}
+    )
+
+
+@router.post("/reset-password")
+async def reset_password(
+    token: str = Form(...), new_password: str = Form(...), db=Depends(get_db)
+):
+    """
+    Скидає пароль користувача на новий, використовуючи токен скидання пароля.
+
+    Args:
+        token (str): JWT-токен для скидання пароля, надісланий на email.
+        new_password (str): Новий пароль, який потрібно встановити.
+        db (Session): Сесія бази даних.
+
+    Raises:
+        HTTPException: Якщо токен недійсний або користувача не знайдено.
+
+    Returns:
+        dict: Повідомлення про успішне оновлення пароля.
+    """
+    email = await verify_password_reset_token(token)
+    if not email:
+        raise HTTPException(status_code=400, detail="Invalid or expired token")
+
+    user = db.query(User).filter_by(email=email).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    user.password = hasher.get_password_hash(new_password)
+    db.commit()
+    return {"message": "Password updated successfully"}
+
+
+@router.post("/request-password-reset")
+async def request_password_reset(
+    email: str, background_tasks: BackgroundTasks, request: Request, db=Depends(get_db)
+):
+    """
+    Надсилає листа з посиланням на скидання пароля користувачу на email.
+
+    Args:
+        email (str): Email-адреса користувача, який хоче скинути пароль.
+        background_tasks (BackgroundTasks): Об'єкт для фонової відправки email.
+        request (Request): HTTP-запит, використовується для отримання базової URL-адреси.
+        db (Session): Сесія бази даних.
+
+    Raises:
+        HTTPException: Якщо користувача з таким email не знайдено.
+
+    Returns:
+        dict: Повідомлення про відправлення посилання для скидання пароля.
+    """
+    user = db.query(User).filter_by(email=email).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    background_tasks.add_task(
+        send_reset_email, user.email, user.username, str(request.base_url)
+    )
+    return {"message": "Reset link sent"}
 
 
 @router.get("/verify-email/{token}")

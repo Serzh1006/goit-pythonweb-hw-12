@@ -6,6 +6,7 @@ from fastapi import Depends, HTTPException, status
 from src.databases.connect import get_db
 from datetime import datetime, timezone, timedelta
 from src.databases.models import User
+from src.cache_func.user_cache import get_user_from_cache, set_user_to_cache
 
 ALGORITHM = os.getenv("ALGORITHM")
 SECRET_KEY = os.getenv("SECRET_KEY")
@@ -49,11 +50,28 @@ async def create_access_token(data: dict, expires_delta=3600):
     return jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
 
 
+async def create_password_reset_token(email: str, expires_delta=timedelta(hours=1)):
+    to_encode = {"sub": email, "exp": datetime.now(timezone.utc) + expires_delta}
+    return jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
+
+async def verify_password_reset_token(token: str): 
+    try:
+        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        return payload.get("sub")
+    except JWTError:
+        return None
+
+
+
 async def get_current_user(
-    token: HTTPAuthorizationCredentials = Depends(HTTPBearer()), db=Depends(get_db)
+    token: HTTPAuthorizationCredentials = Depends(HTTPBearer()),
+    db = Depends(get_db)
 ):
     """
-    Отримує поточного авторизованого користувача з JWT токена.
+    Отримує поточного авторизованого користувача з кешу Redis або бази даних на основі JWT токена.
+
+    Спочатку функція перевіряє наявність даних користувача в Redis. Якщо кеш порожній або недійсний,
+    тоді звертається до бази даних, отримує користувача та зберігає його в Redis для подальшого використання.
 
     Args:
         token (HTTPAuthorizationCredentials): JWT токен з заголовка Authorization.
@@ -63,23 +81,29 @@ async def get_current_user(
         HTTPException: Якщо токен недійсний або користувача не знайдено.
 
     Returns:
-        User: Об'єкт користувача з бази даних.
+        User: Об'єкт користувача.
     """
     credentials_exception = HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
         detail="Could not validate credentials",
         headers={"WWW-Authenticate": "Bearer"},
     )
+
     try:
-        # Decode JWT
         payload = jwt.decode(token.credentials, SECRET_KEY, algorithms=[ALGORITHM])
-        email = payload["sub"]
+        email = payload.get("sub")
         if email is None:
             raise credentials_exception
-    except JWTError as e:
+    except JWTError:
         raise credentials_exception
+
+    cached_user = await get_user_from_cache(email)
+    if cached_user:
+        return cached_user
 
     user = db.query(User).filter(User.email == email).first()
     if user is None:
         raise credentials_exception
+
+    await set_user_to_cache(user)
     return user

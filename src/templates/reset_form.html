@@ -1,0 +1,15 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>Reset Password</title>
+  </head>
+  <body>
+    <h2>Reset your password</h2>
+    <form action="/auth/reset-password" method="post">
+      <input type="hidden" name="token" value="{{ token }}" />
+      <label>New password:</label>
+      <input type="password" name="new_password" required />
+      <button type="submit">Submit</button>
+    </form>
+  </body>
+</html>
