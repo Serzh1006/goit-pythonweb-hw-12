@@ -25,5 +25,6 @@ async def set_user_to_cache(user: User):
         "email": user.email,
         "avatar": user.avatar,
         "confirmed": user.confirmed,
+        "role": user.role,
     }
     await r.set(user.email, json.dumps(user_dict), ex=3600)

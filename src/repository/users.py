@@ -1,7 +1,18 @@
+from fastapi import Depends, HTTPException, status
 from src.auth.auth import Hash
 from src.databases.models import User
+from src.auth.auth import get_current_user
 
 hasher = Hash()
+
+
+async def admin_required(current_user = Depends(get_current_user)):
+    if current_user.role != "admin":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Admin access required",
+        )
+    return current_user
 
 
 async def create_user(user_data, db):
@@ -20,6 +31,7 @@ async def create_user(user_data, db):
         email=user_data.email,
         password=hasher.get_password_hash(user_data.password),
         avatar=None,
+        role = user_data.role
     )
     db.add(user)
     db.commit()

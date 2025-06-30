@@ -6,6 +6,9 @@ from src.databases.connect import get_db
 from src.databases.models import User
 from src.schemas.user import UserOut
 from src.services.update_avatar import upload_avatar
+from src.cache_func.user_cache import set_user_to_cache
+from src.repository.users import admin_required
+
 
 router = APIRouter(prefix="/users", tags=["users"])
 
@@ -40,7 +43,7 @@ async def me(request: Request, user: User = Depends(get_current_user)):
 )
 async def update_avatar(
     file: UploadFile = File(...),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(admin_required),
     db=Depends(get_db),
 ):
     """
@@ -68,9 +71,12 @@ async def update_avatar(
 
     public_id = f"user_avatars/{current_user.id}"
     avatar_url = upload_avatar(file, public_id)
+    user = db.query(User).filter(User.id == current_user.id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
 
-    current_user.avatar = avatar_url
+    user.avatar = avatar_url
     db.commit()
-    db.refresh(current_user)
-
+    db.refresh(user)
+    await set_user_to_cache(user)
     return {"avatar_url": avatar_url}

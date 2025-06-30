@@ -99,7 +99,7 @@ async def get_current_user(
 
     cached_user = await get_user_from_cache(email)
     if cached_user:
-        return cached_user
+        return User(**cached_user)
 
     user = db.query(User).filter(User.email == email).first()
     if user is None:
