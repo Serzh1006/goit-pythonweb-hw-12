@@ -1,4 +1,5 @@
 from fastapi import Depends, HTTPException, status
+from sqlalchemy import select
 from src.auth.auth import Hash
 from src.databases.models import User
 from src.auth.auth import get_current_user
@@ -51,7 +52,8 @@ async def authenticate_user(email: str, password: str, db):
     Returns:
         User | None: Користувач, якщо автентифікація пройшла успішно, або None.
     """
-    user = db.query(User).filter(User.email == email).first()
+    result = await db.execute(select(User).filter(User.email == email))
+    user = result.scalars().first()
     if not user or not hasher.verify_password(password, user.password):
         return None
     return user
