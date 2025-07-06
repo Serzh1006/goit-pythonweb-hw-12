@@ -1,5 +1,6 @@
 from src.databases.models import Contact, User
 from datetime import datetime, timedelta
+from sqlalchemy import select, and_
 
 
 async def create_contact(contact, current_user: User, db):
@@ -32,7 +33,10 @@ async def get_contacts(current_user: User, db):
     Returns:
         List[Contact]: Список контактів.
     """
-    return db.query(Contact).filter(Contact.user_id == current_user.id).all()
+    stmt = select(Contact).where(Contact.user_id == current_user.id)
+    result = await db.execute(stmt)
+    contacts = result.scalars().all()
+    return contacts
 
 
 async def get_contact_by_ID(contact_id: int, current_user: User, db):
@@ -47,11 +51,13 @@ async def get_contact_by_ID(contact_id: int, current_user: User, db):
     Returns:
         Contact | None: Контакт або None, якщо не знайдено.
     """
-    return (
-        db.query(Contact)
-        .filter(Contact.id == contact_id, Contact.user_id == current_user.id)
-        .first()
+    stmt = select(Contact).where(
+        Contact.id == contact_id,
+        Contact.user_id == current_user.id
     )
+    result = await db.execute(stmt)
+    contact = result.scalars().first()
+    return contact
 
 
 async def update_contact(contact_data, contact_id: int, current_user: User, db):
@@ -95,7 +101,7 @@ async def delete_contact(contact_id: int, current_user: User, db):
     return contact
 
 
-def find_search(first_name, last_name, email, current_user: User, db):
+async def find_search(first_name, last_name, email, current_user: User, db):
     """
     Шукає контакти поточного користувача за іменем, прізвищем або email.
 
@@ -109,14 +115,19 @@ def find_search(first_name, last_name, email, current_user: User, db):
     Returns:
         List[Contact]: Список знайдених контактів.
     """
-    query = db.query(Contact).filter(Contact.user_id == current_user.id)
+    filters = [Contact.user_id == current_user.id]
+
     if first_name:
-        query = query.filter(Contact.first_name.ilike(f"%{first_name}%"))
+        filters.append(Contact.first_name.ilike(f"%{first_name}%"))
     if last_name:
-        query = query.filter(Contact.last_name.ilike(f"%{last_name}%"))
+        filters.append(Contact.last_name.ilike(f"%{last_name}%"))
     if email:
-        query = query.filter(Contact.email.ilike(f"%{email}%"))
-    return query.all()
+        filters.append(Contact.email.ilike(f"%{email}%"))
+
+    stmt = select(Contact).where(and_(*filters))
+    result = await db.execute(stmt)
+    contacts = result.scalars().all()
+    return contacts
 
 
 async def contacts_birthday(current_user: User, db):
@@ -132,7 +143,9 @@ async def contacts_birthday(current_user: User, db):
     """
     today = datetime.today().date()
     next_week = today + timedelta(days=7)
-    contacts = db.query(Contact).filter(Contact.user_id == current_user.id).all()
+    stmt = select(Contact).where(Contact.user_id == current_user.id)
+    result = await db.execute(stmt)
+    contacts = result.scalars().all()
     upcoming = []
 
     for contact in contacts:

@@ -1,11 +1,14 @@
 import sys
 import os
-import asyncio
 import pytest
 import pytest_asyncio
+from httpx import AsyncClient
 from fastapi.testclient import TestClient
 from sqlalchemy.pool import StaticPool
+from src.auth.auth import get_current_user
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker, AsyncSession
+from src.databases.models import Contact
 
 from main import app
 from src.databases.models import User
@@ -58,22 +61,34 @@ async def async_session():
 
 @pytest_asyncio.fixture(scope="module")
 def client():
-    # Dependency override
-
     async def override_get_db():
         async with TestingSessionLocal() as session:
-            try:
-                yield session
-            except Exception as err:
-                await session.rollback()
-                raise
+            yield session
+
+    async def override_get_current_user():
+        async with TestingSessionLocal() as session:
+            result = await session.execute(select(User).where(User.email == test_user["email"]))
+            user = result.scalar_one()
+            return user
 
     app.dependency_overrides[get_db] = override_get_db
+    app.dependency_overrides[get_current_user] = override_get_current_user
 
     yield TestClient(app)
 
-@pytest_asyncio.fixture()
+@pytest.fixture()
 async def get_token():
-    token = await create_access_token(data={"sub": test_user["username"]})
+    token = await create_access_token(data={"sub": test_user["email"]})
     return token
 
+@pytest.fixture
+async def existing_contact_id(async_session):
+    result = await async_session.execute(select(Contact).limit(1))
+    contact = result.scalars().first()
+    assert contact is not None
+    return contact.id
+
+@pytest.fixture
+async def async_client():
+    async with AsyncClient(app=app, base_url="http://testserver") as client:
+        yield client

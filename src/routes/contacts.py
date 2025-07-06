@@ -69,7 +69,7 @@ async def search_contacts(
     Returns:
         Список знайдених контактів.
     """
-    find_contact = crud.find_search(first_name, last_name, email, current_user, db)
+    find_contact = await crud.find_search(first_name, last_name, email, current_user, db)
     if not find_contact:
         raise HTTPException(status_code=404, detail="Contact not found")
     return find_contact
