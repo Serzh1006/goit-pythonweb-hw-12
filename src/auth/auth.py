@@ -1,6 +1,7 @@
 from passlib.context import CryptContext
 from jose import jwt, JWTError
 import os
+from sqlalchemy import select
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from fastapi import Depends, HTTPException, status
 from src.databases.connect import get_db
@@ -101,7 +102,9 @@ async def get_current_user(
     if cached_user:
         return User(**cached_user)
 
-    user = db.query(User).filter(User.email == email).first()
+    stmt = select(User).where(User.email == email)
+    result = await db.execute(stmt)
+    user = result.scalar_one_or_none()
     if user is None:
         raise credentials_exception
 

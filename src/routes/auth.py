@@ -1,5 +1,6 @@
 from src.schemas.user import UserCreate, UserLogin
 from src.databases.connect import get_db
+from sqlalchemy import select
 from fastapi import (
     Depends,
     HTTPException,
@@ -57,7 +58,9 @@ async def reset_password(
     if not email:
         raise HTTPException(status_code=400, detail="Invalid or expired token")
 
-    user = db.query(User).filter_by(email=email).first()
+    stmt = select(User).where(User.email == email)
+    result = await db.execute(stmt)
+    user = result.scalars().first()
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
 
@@ -85,7 +88,9 @@ async def request_password_reset(
     Returns:
         dict: Повідомлення про відправлення посилання для скидання пароля.
     """
-    user = db.query(User).filter_by(email=email).first()
+    stmt = select(User).where(User.email == email)
+    result = await db.execute(stmt)
+    user = result.scalars().first()
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
     background_tasks.add_task(
@@ -111,7 +116,9 @@ async def verify_email(token: str, db=Depends(get_db)):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid or expired token"
         )
-    user = db.query(User).filter(User.email == email).first()
+    stmt = select(User).where(User.email == email)
+    result = await db.execute(stmt)
+    user = result.scalars().first()
     if not user:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail="User not found"
@@ -141,7 +148,8 @@ async def register(
     Returns:
         - email користувача у відповідь
     """
-    existing = db.query(User).filter_by(email=user.email).first()
+    result = await db.execute(select(User).where(User.email == user.email))
+    existing = result.scalar_one_or_none()
     if existing:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT, detail="Email already registered"

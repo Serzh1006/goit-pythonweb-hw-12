@@ -16,8 +16,8 @@ async def create_contact(contact, current_user: User, db):
     """
     new_contact = Contact(**contact.model_dump(), user_id=current_user.id)
     db.add(new_contact)
-    db.commit()
-    db.refresh(new_contact)
+    await db.commit()
+    await db.refresh(new_contact)
     return new_contact
 
 

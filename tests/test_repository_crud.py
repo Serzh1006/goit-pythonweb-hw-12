@@ -1,6 +1,6 @@
 import pytest
 import asyncio
-from unittest.mock import AsyncMock, patch, MagicMock
+from unittest.mock import  patch, MagicMock
 from datetime import date, timedelta
 from src.repository.crud import update_contact, delete_contact, create_contact, contacts_birthday, get_contact_by_ID, get_contacts, find_search
 from src.databases.models import Contact, User
@@ -135,7 +135,7 @@ def test_find_search(db, current_user):
     result = find_search("John", None, None, current_user, db)
 
     db.query.assert_called_once()
-    query_mock.filter.assert_called()  # Проверяем, что фильтрация применена
+    query_mock.filter.assert_called()
     assert result == fake_contacts
 
 def test_contacts_birthday(db, current_user):
